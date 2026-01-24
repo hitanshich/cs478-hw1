@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+  "dev": "npm run build && node dist/server.js",
   "setup": "sqlite3 database.db < sql/setup.sql",
   "build": "tsc",
   "start": "node dist/server.js",

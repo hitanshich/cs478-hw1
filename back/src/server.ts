@@ -10,6 +10,8 @@ import {
 const app = express();
 app.use(express.json());
 
+
+
 function parsePositiveInt(value: string): number | null {
   const n = Number(value);
   if (!Number.isInteger(n) || n <= 0) return null;
@@ -29,7 +31,7 @@ function requirePositiveIntParam(value: unknown, res: Response): number | null {
   return n;
 }
 
-app.post("/authors", async (req: Request, res: Response) => {
+app.post("/api/authors", async (req: Request, res: Response) => {
   const parsed = AuthorCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -50,13 +52,13 @@ app.post("/authors", async (req: Request, res: Response) => {
   return res.status(201).set("Location", created.id.toString()).json(created);
 });
 
-app.get("/authors", async (_req: Request, res: Response) => {
+app.get("/api/authors", async (_req: Request, res: Response) => {
   const db = await openDb();
   const authors = await db.all<Author[]>("SELECT id, name, bio FROM authors");
   return res.json(authors);
 });
 
-app.get("/authors/:id", async (req: Request, res: Response) => {
+app.get("/api/authors/:id", async (req: Request, res: Response) => {
   const id = requirePositiveIntParam(req.params.id, res);
   if (id === null) return;
 
@@ -73,7 +75,7 @@ app.get("/authors/:id", async (req: Request, res: Response) => {
   return res.json(author);
 });
 
-app.delete("/authors/:id", async (req: Request, res: Response) => {
+app.delete("/api/authors/:id", async (req: Request, res: Response) => {
   const id = requirePositiveIntParam(req.params.id, res);
   if (id === null) return;
 
@@ -91,7 +93,7 @@ app.delete("/authors/:id", async (req: Request, res: Response) => {
   }
 });
 
-app.post("/books", async (req: Request, res: Response) => {
+app.post("/api/books", async (req: Request, res: Response) => {
   const parsed = BookCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -128,7 +130,7 @@ app.post("/books", async (req: Request, res: Response) => {
   return res.status(201).set("Location", created.id.toString()).json(created);
 });
 
-app.get("/books", async (req: Request, res: Response) => {
+app.get("/api/books", async (req: Request, res: Response) => {
   const db = await openDb();
 
   const { authorID, genre, minYear } = req.query;
@@ -176,7 +178,7 @@ app.get("/books", async (req: Request, res: Response) => {
   return res.json(books);
 });
 
-app.get("/books/:id", async (req: Request, res: Response) => {
+app.get("/api/books/:id", async (req: Request, res: Response) => {
   const id = requirePositiveIntParam(req.params.id, res);
   if (id === null) return;
 
@@ -200,7 +202,7 @@ app.get("/books/:id", async (req: Request, res: Response) => {
   return res.json(book);
 });
 
-app.delete("/books/:id", async (req: Request, res: Response) => {
+app.delete("/api/books/:id", async (req: Request, res: Response) => {
   const id = requirePositiveIntParam(req.params.id, res);
   if (id === null) return;
 
