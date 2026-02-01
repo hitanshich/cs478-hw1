@@ -93,6 +93,55 @@ app.delete("/api/authors/:id", async (req: Request, res: Response) => {
   }
 });
 
+app.put("/api/books/:id", async (req: Request, res: Response) => {
+  let id = requirePositiveIntParam(req.params.id, res) ;
+  if (id == null) return;
+
+  let parsedRequest = BookCreateSchema.safeParse(req.body);
+  if (!parsedRequest.success) {
+    return res.status(400).json({error: parsedRequest.error.flatten() });
+  }
+
+  let db = await openDb();
+
+  let author = await db.get<Author>(
+    "SELECT id FROM authors WHERE id = ?",
+    parsedRequest.data.authorID
+  );
+  if(!author) {
+    return res.status(400).json({error: "AuthorID does not exist" });
+  }
+
+  let savedBook = await db.get<Book>(
+    "SELECT id FROM books WHERE id = ?", 
+    id
+  );
+  if(!savedBook) {
+    return res.status(404).json({error: "Book not found"});
+  }
+
+  await db.run(
+    "UPDATE books SET author_id = ?, title = ?, pub_year = ?, genre = ? WHERE id = ?", 
+    [
+      parsedRequest.data.authorID,
+      parsedRequest.data.title,
+      parsedRequest.data.publishYear,
+      parsedRequest.data.genre, 
+      id
+    ]
+  );
+
+  let editedBook: Book = {
+    id, 
+    authorID: parsedRequest.data.authorID, 
+    title: parsedRequest.data.title,
+    publishYear: parsedRequest.data.publishYear,
+    genre: parsedRequest.data.genre
+
+  };
+
+  return res.json(editedBook);
+})
 app.post("/api/books", async (req: Request, res: Response) => {
   const parsed = BookCreateSchema.safeParse(req.body);
   if (!parsed.success) {

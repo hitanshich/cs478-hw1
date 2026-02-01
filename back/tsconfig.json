@@ -45,6 +45,7 @@
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
   },
-  "include": ["src"],
-  "exclude": ["test", "node_modules"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["test", "node_modules", "dist"]
+
 }

@@ -13,7 +13,8 @@ let db: Database = await open({
 let port = 3000;
 let host = "localhost";
 let protocol = "http";
-let baseURL = `${protocol}://${host}:${port}`;
+let baseURL = `${protocol}://${host}:${port}/api`;
+
 
 axios.defaults.baseURL = baseURL;
 
@@ -179,4 +180,30 @@ test("DELETE /books/:id deletes book", async () => {
 
   let row = await db.get("SELECT * FROM books WHERE id = ?", [2]);
   expect(row).toBeUndefined();
+});
+
+test("PUT /books/:id edits a book", async () => {
+  const body = {
+    authorID: 1,
+    title: "Edited Title",
+    publishYear: "2001",
+    genre: "history",
+  };
+
+  const res = await axios.put("/books/1", body);
+  expect(res.status).toBe(200);
+  expect(res.data).toEqual({ id: 1, ...body });
+
+  const row = await db.get("SELECT * FROM books WHERE id = ?", [1]);
+  expect(row).toEqual({
+    id: 1,
+    author_id: body.authorID,
+    title: body.title,
+    pub_year: body.publishYear,
+    genre: body.genre,
+  });
+});
+
+test("DELETE /books/:id missing returns 404", async () => {
+  await expectAxiosStatus(axios.delete("/books/999"), 404);
 });

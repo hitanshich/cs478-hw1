@@ -3,3 +3,4 @@ database.db
 dist
 .env
 
+.DS_Store

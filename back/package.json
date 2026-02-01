@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
   "dev": "npm run build && node dist/server.js",
-  "setup": "sqlite3 database.db < sql/setup.sql",
-  "build": "tsc",
+  "setup": "sqlite3 database.db < ./setup.sql",
+  "build": "tsc -p tsconfig.build.json",
   "start": "node dist/server.js",
-  "test": "NODE_ENV=test vitest --fileParallelism=false"
+  "test": "NODE_ENV=test vitest --fileParallelism=false", 
+  "data": "sqlite3 database.db < ./data.sql"
 }
 ,
   "keywords": [],
