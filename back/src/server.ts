@@ -265,7 +265,9 @@ app.delete("/api/books/:id", async (req: Request, res: Response) => {
   return res.status(204).send();
 });
 
-export default app;
+export { app };
+export default app; 
+
 
 if (process.env.NODE_ENV !== "test") {
   const port = 3000;
