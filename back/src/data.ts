@@ -4,66 +4,68 @@ import argon2 from "argon2";
 async function main() {
   const db = await openDb();
 
-  // Clear tables (order matters because of foreign keys)
-  await db.run("DELETE FROM books");
+  await db.exec("PRAGMA foreign_keys = ON;");
+
   await db.run("DELETE FROM sessions");
+  await db.run("DELETE FROM books");
   await db.run("DELETE FROM users");
   await db.run("DELETE FROM authors");
 
-  // Seed authors
-  const authorRows = [
-    { name: "Jules Verne", bio: "French novelist, poet, and playwright." },
-    { name: "Ursula K. Le Guin", bio: "American author known for speculative fiction." },
-    { name: "Mary Shelley", bio: "English novelist who wrote Frankenstein." },
+  const authorsToAdd = [
+    { name: "J.K. Rowling", bio: "Science Fiction author." },
+    { name: "Freida McFadden", bio: "Murder Mystery author." },
+    { name: "Colleen Hoover", bio: "Romance Fiction author." },
   ];
 
-  const authorIDs: number[] = [];
-  for (const a of authorRows) {
-    const r = await db.run("INSERT INTO authors (name, bio) VALUES (?, ?)", [a.name, a.bio]);
-    authorIDs.push(r.lastID as number);
+  const authorIds: number[] = [];
+  for (const a of authorsToAdd) {
+    const result = await db.run("INSERT INTO authors (name, bio) VALUES (?, ?)", [
+      a.name,
+      a.bio,
+    ]);
+    authorIds.push(result.lastID as number);
   }
 
-  // Seed required dummy user: foo / bar
+  // 2) Add the required dummy user: foo / bar
   const username = "foo";
   const password = "bar";
   const passwordHash = await argon2.hash(password);
 
-  const userRes = await db.run(
+  const userResult = await db.run(
     "INSERT INTO users (username, password_hash) VALUES (?, ?)",
     [username, passwordHash]
   );
-  const fooUserID = userRes.lastID as number;
+  const fooUserId = userResult.lastID as number;
 
-  // Seed books owned by foo
-  const bookRows = [
+  const booksToAdd = [
     {
-      authorID: authorIDs[0],
-      title: "Twenty Thousand Leagues Under the Seas",
-      pubYear: "1870",
-      genre: "adventure",
+      authorId: authorIds[0],
+      title: "Harry Potter & The Chamber of Secrets",
+      pubYear: "1998",
+      genre: "Sci-Fi",
     },
     {
-      authorID: authorIDs[1],
-      title: "A Wizard of Earthsea",
-      pubYear: "1968",
-      genre: "fantasy",
+      authorId: authorIds[1],
+      title: "Never Lie",
+      pubYear: "2022",
+      genre: "Mystery",
     },
     {
-      authorID: authorIDs[2],
-      title: "Frankenstein",
-      pubYear: "1818",
-      genre: "horror",
+      authorId: authorIds[2],
+      title: "Verity",
+      pubYear: "2018",
+      genre: "Psychological Thriller",
     },
   ];
 
-  for (const b of bookRows) {
+  for (const b of booksToAdd) {
     await db.run(
       "INSERT INTO books (author_id, created_by_user_id, title, pub_year, genre) VALUES (?, ?, ?, ?, ?)",
-      [b.authorID, fooUserID, b.title, b.pubYear, b.genre]
+      [b.authorId, fooUserId, b.title, b.pubYear, b.genre]
     );
   }
 
-  console.log("Seeded database with authors, books, and user foo/bar.");
+  console.log("Seeded database with your authors/books and dummy user foo/bar.");
 }
 
 main().catch((err) => {

@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "test": "NODE_ENV=test vitest --fileParallelism=false",
-    "data": "sqlite3 database.db < data.sql"
+    "data": "tsx src/data.ts"
 
   },
   "keywords": [],
