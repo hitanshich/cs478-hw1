@@ -33,9 +33,15 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 
+type User = {
+  id: number;
+  username: string;
+};
+
 type Book = {
   id: number;
   authorID: number;
+  createdByUserID: number;
   title: string;
   publishYear: string;
   genre: string;
@@ -81,23 +87,110 @@ export default function App() {
     genre: "",
   });
 
+  let [user, setUser] = useState<User | null>(null);
+  let [authMessage, setAuthMessage] = useState<string | null>(null);
+
+  let [loginUsername, setLoginUsername] = useState("");
+  let [loginPassword, setLoginPassword] = useState("");
+  let [registerUsername, setRegisterUsername] = useState("");
+  let [registerPassword, setRegisterPassword] = useState("");
+
+  async function refreshBooksAndAuthors() {
+    const booksRes = await api.get<Book[]>("/books");
+    setBooks(booksRes.data);
+
+    const authorsRes = await api.get<Author[]>("/authors");
+    setAuthors(authorsRes.data);
+  }
+
+  async function refreshMe() {
+    try {
+      const meRes = await api.get<User>("/auth/me");
+      setUser(meRes.data);
+    } catch {
+      setUser(null);
+    }
+  }
+
   useEffect(() => {
     (async () => {
       try {
-        const booksRes = await api.get<Book[]>("/books");
-        setBooks(booksRes.data);
-
-        const authorsRes = await api.get<Author[]>("/authors");
-        setAuthors(authorsRes.data);
+        await refreshMe();
+        await refreshBooksAndAuthors();
       } catch {
         setError("Failed to load data.");
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // If user logs out, close any destructive dialogs
+  useEffect(() => {
+    if (!user) {
+      setEditOpen(false);
+      setBookToEdit(null);
+      setEditError(null);
+
+      setDeleteOpen(false);
+      setBookToDelete(null);
+      setDeleteError(null);
+    }
+  }, [user]);
+
+  async function doLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthMessage(null);
+
+    try {
+      await api.post("/auth/login", {
+        username: loginUsername.trim(),
+        password: loginPassword,
+      });
+
+      setLoginPassword("");
+      await refreshMe();
+      await refreshBooksAndAuthors();
+      setAuthMessage("Logged in!");
+    } catch (err: any) {
+      setAuthMessage(err.response?.data?.error ?? "Login failed");
+    }
+  }
+
+  async function doRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthMessage(null);
+
+    try {
+      await api.post("/auth/register", {
+        username: registerUsername.trim(),
+        password: registerPassword,
+      });
+
+      setRegisterPassword("");
+      setAuthMessage("Account created! You can log in now.");
+    } catch (err: any) {
+      setAuthMessage(err.response?.data?.error ?? "Register failed");
+    }
+  }
+
+  async function doLogout() {
+    setAuthMessage(null);
+    try {
+      await api.post("/auth/logout");
+    } finally {
+      setUser(null);
+      setAuthMessage("Logged out.");
+    }
+  }
 
   async function submitBook(e: React.FormEvent) {
     e.preventDefault();
     setBookMessage(null);
+
+    if (!user) {
+      setBookMessage("You must be logged in to create books.");
+      return;
+    }
 
     const year = bookYear.trim();
 
@@ -135,8 +228,7 @@ export default function App() {
       setBookYear("");
       setBookGenre("");
 
-      const booksRes = await api.get<Book[]>("/books");
-      setBooks(booksRes.data);
+      await refreshBooksAndAuthors();
     } catch (err: any) {
       setBookMessage(err.response?.data?.error ?? "Failed to create book");
     }
@@ -163,6 +255,11 @@ export default function App() {
     e.preventDefault();
     setAuthorMessage(null);
 
+    if (!user) {
+      setAuthorMessage("You must be logged in to create authors.");
+      return;
+    }
+
     try {
       await api.post("/authors", { name: authorName.trim(), bio: authorBio.trim() });
       setAuthorMessage("Author created successfully");
@@ -182,11 +279,118 @@ export default function App() {
         Library
       </Typography>
 
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          alignItems={{ md: "center" }}
+          justifyContent="space-between"
+        >
+          <Box>
+            <Typography variant="h6">Account</Typography>
+            {user ? (
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 1 }}>
+                <Typography>
+                  Welcome <b>{user.username}</b>!
+                </Typography>
+                <Button variant="outlined" onClick={doLogout}>
+                  Log out
+                </Button>
+              </Stack>
+            ) : (
+              <Typography sx={{ mt: 1 }} color="text.secondary">
+                You are not logged in. Log in to add/edit/delete.
+              </Typography>
+            )}
+          </Box>
+
+          {!user && (
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              sx={{ width: { md: "60%" } }}
+            >
+              <Box
+                component="form"
+                onSubmit={doLogin}
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  flex: 1,
+                  flexDirection: { xs: "column", sm: "row" },
+                }}
+              >
+                <TextField
+                  label="Username"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  size="small"
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Password"
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  size="small"
+                  required
+                  fullWidth
+                />
+                <Button type="submit" variant="contained">
+                  Log in
+                </Button>
+              </Box>
+
+              <Box
+                component="form"
+                onSubmit={doRegister}
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  flex: 1,
+                  flexDirection: { xs: "column", sm: "row" },
+                }}
+              >
+                <TextField
+                  label="New username"
+                  value={registerUsername}
+                  onChange={(e) => setRegisterUsername(e.target.value)}
+                  size="small"
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="New password"
+                  type="password"
+                  value={registerPassword}
+                  onChange={(e) => setRegisterPassword(e.target.value)}
+                  size="small"
+                  required
+                  fullWidth
+                />
+                <Button type="submit" variant="outlined">
+                  Register
+                </Button>
+              </Box>
+            </Stack>
+          )}
+        </Stack>
+
+        {authMessage && (
+  <Alert severity={user ? "success" : "error"} sx={{ mt: 2 }}>
+    {authMessage}
+  </Alert>
+)}
+
+      </Paper>
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
+
       <Box
         sx={{
           display: "grid",
@@ -195,126 +399,134 @@ export default function App() {
           alignItems: "start",
         }}
       >
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Add Author
-          </Typography>
+        {user ? (
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Add Author
+            </Typography>
 
-          <Box
-            component="form"
-            onSubmit={submitAuthor}
-            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-          >
-            <TextField
-              label="Name"
-              value={authorName}
-              onChange={(e) => setAuthorName(e.target.value)}
-              required
-              fullWidth
-            />
-
-            <TextField
-              label="Bio"
-              value={authorBio}
-              onChange={(e) => setAuthorBio(e.target.value)}
-              required
-              fullWidth
-            />
-
-            <Button type="submit" variant="contained">
-              Create Author
-            </Button>
-          </Box>
-
-          {authorMessage && (
-            <Alert
-              severity={
-                authorMessage.toLowerCase().includes("success") ? "success" : "error"
-              }
-              sx={{ mt: 2 }}
+            <Box
+              component="form"
+              onSubmit={submitAuthor}
+              sx={{ display: "flex", flexDirection: "column", gap: 2 }}
             >
-              {authorMessage}
-            </Alert>
-          )}
-        </Paper>
-
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Add Book
-          </Typography>
-
-          <Box
-            component="form"
-            onSubmit={submitBook}
-            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-          >
-            <TextField
-              select
-              label="Author"
-              value={bookAuthorID}
-              onChange={(e) => setBookAuthorID(e.target.value)}
-              required
-              fullWidth
-            >
-              <MenuItem value="">Select an author</MenuItem>
-              {authors.map((a) => (
-                <MenuItem key={a.id} value={a.id.toString()}>
-                  {a.name} (ID {a.id})
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
-                label="Title"
-                value={bookTitle}
-                onChange={(e) => setBookTitle(e.target.value)}
+                label="Name"
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
                 required
                 fullWidth
               />
 
               <TextField
-                label="Publish Year (YYYY)"
-                value={bookYear}
-                onChange={(e) => setBookYear(e.target.value)}
+                label="Bio"
+                value={authorBio}
+                onChange={(e) => setAuthorBio(e.target.value)}
                 required
                 fullWidth
-                inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
               />
-            </Stack>
 
-            <TextField
-              label="Genre"
-              value={bookGenre}
-              onChange={(e) => setBookGenre(e.target.value)}
-              required
-              fullWidth
-            />
+              <Button type="submit" variant="contained">
+                Create Author
+              </Button>
+            </Box>
 
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={bookAuthorID.trim() === ""}
-              sx={{
-                opacity: bookAuthorID.trim() === "" ? 0.5 : 1,
-              }}
+            {authorMessage && (
+              <Alert
+                severity={
+                  authorMessage.toLowerCase().includes("success") ? "success" : "error"
+                }
+                sx={{ mt: 2 }}
+              >
+                {authorMessage}
+              </Alert>
+            )}
+          </Paper>
+        ) : (
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Add Author
+            </Typography>
+            <Alert severity="info">Log in to create authors.</Alert>
+          </Paper>
+        )}
+
+        {user ? (
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Add Book
+            </Typography>
+
+            <Box
+              component="form"
+              onSubmit={submitBook}
+              sx={{ display: "flex", flexDirection: "column", gap: 2 }}
             >
-              Create Book
-            </Button>
+              <TextField
+                select
+                label="Author"
+                value={bookAuthorID}
+                onChange={(e) => setBookAuthorID(e.target.value)}
+                required
+                fullWidth
+              >
+                <MenuItem value="">Select an author</MenuItem>
+                {authors.map((a) => (
+                  <MenuItem key={a.id} value={a.id.toString()}>
+                    {a.name} (ID {a.id})
+                  </MenuItem>
+                ))}
+              </TextField>
 
-          </Box>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  label="Title"
+                  value={bookTitle}
+                  onChange={(e) => setBookTitle(e.target.value)}
+                  required
+                  fullWidth
+                />
 
-          {bookMessage && (
-            <Alert
-              severity={
-                bookMessage.toLowerCase().includes("success") ? "success" : "error"
-              }
-              sx={{ mt: 2 }}
-            >
-              {bookMessage}
-            </Alert>
-          )}
-        </Paper>
+                <TextField
+                  label="Publish Year (YYYY)"
+                  value={bookYear}
+                  onChange={(e) => setBookYear(e.target.value)}
+                  required
+                  fullWidth
+                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                />
+              </Stack>
+
+              <TextField
+                label="Genre"
+                value={bookGenre}
+                onChange={(e) => setBookGenre(e.target.value)}
+                required
+                fullWidth
+              />
+
+              <Button type="submit" variant="contained" disabled={bookAuthorID.trim() === ""}>
+                Create Book
+              </Button>
+            </Box>
+
+            {bookMessage && (
+              <Alert
+                severity={bookMessage.toLowerCase().includes("success") ? "success" : "error"}
+                sx={{ mt: 2 }}
+              >
+                {bookMessage}
+              </Alert>
+            )}
+          </Paper>
+        ) : (
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Add Book
+            </Typography>
+            <Alert severity="info">Log in to create books.</Alert>
+          </Paper>
+        )}
 
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom>
@@ -386,6 +598,7 @@ export default function App() {
                 .sort((a, b) => a.title.localeCompare(b.title))
                 .map((b) => {
                   const author = authors.find((a) => a.id === b.authorID);
+                  const isOwner = !!user && b.createdByUserID === user.id;
 
                   return (
                     <TableRow key={b.id}>
@@ -396,41 +609,47 @@ export default function App() {
                       <TableCell>{b.authorID}</TableCell>
 
                       <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <IconButton
-                            color="primary"
-                            size="small"
-                            onClick={() => {
-                              setBookToEdit(b);
-                              setEditError(null);
+                        {isOwner ? (
+                          <Stack direction="row" spacing={1} justifyContent="flex-end">
+                            <IconButton
+                              color="primary"
+                              size="small"
+                              onClick={() => {
+                                setBookToEdit(b);
+                                setEditError(null);
 
-                              setEditForm({
-                                authorID: b.authorID.toString(),
-                                title: b.title,
-                                publishYear: b.publishYear,
-                                genre: b.genre,
-                              });
+                                setEditForm({
+                                  authorID: b.authorID.toString(),
+                                  title: b.title,
+                                  publishYear: b.publishYear,
+                                  genre: b.genre,
+                                });
 
-                              setEditOpen(true);
-                            }}
-                            aria-label="edit book"
-                          >
-                            <EditIcon />
-                          </IconButton>
+                                setEditOpen(true);
+                              }}
+                              aria-label="edit book"
+                            >
+                              <EditIcon />
+                            </IconButton>
 
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() => {
-                              setBookToDelete(b);
-                              setDeleteError(null);
-                              setDeleteOpen(true);
-                            }}
-                            aria-label="delete book"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Stack>
+                            <IconButton
+                              color="error"
+                              size="small"
+                              onClick={() => {
+                                setBookToDelete(b);
+                                setDeleteError(null);
+                                setDeleteOpen(true);
+                              }}
+                              aria-label="delete book"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            {user ? "Not yours" : "Log in"}
+                          </Typography>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -483,9 +702,7 @@ export default function App() {
 
               try {
                 await api.delete(`/books/${bookToDelete.id}`);
-
-                const booksRes = await api.get<Book[]>("/books");
-                setBooks(booksRes.data);
+                await refreshBooksAndAuthors();
 
                 setDeleteOpen(false);
                 setBookToDelete(null);
@@ -512,9 +729,7 @@ export default function App() {
       >
         <DialogTitle>Edit book</DialogTitle>
 
-        <DialogContent
-          sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
-        >
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <FormControl fullWidth required>
             <InputLabel id="edit-author-label">Author</InputLabel>
             <Select
@@ -522,9 +737,7 @@ export default function App() {
               id="edit-author"
               value={editForm.authorID}
               label="Author"
-              onChange={(e) =>
-                setEditForm((prev) => ({ ...prev, authorID: e.target.value }))
-              }
+              onChange={(e) => setEditForm((prev) => ({ ...prev, authorID: e.target.value }))}
             >
               <MenuItem value="">Select an author</MenuItem>
               {authors.map((a) => (
@@ -538,9 +751,7 @@ export default function App() {
           <TextField
             label="Title"
             value={editForm.title}
-            onChange={(e) =>
-              setEditForm((prev) => ({ ...prev, title: e.target.value }))
-            }
+            onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
             required
             fullWidth
           />
@@ -559,9 +770,7 @@ export default function App() {
           <TextField
             label="Genre"
             value={editForm.genre}
-            onChange={(e) =>
-              setEditForm((prev) => ({ ...prev, genre: e.target.value }))
-            }
+            onChange={(e) => setEditForm((prev) => ({ ...prev, genre: e.target.value }))}
             required
             fullWidth
           />
@@ -607,8 +816,7 @@ export default function App() {
                   genre,
                 });
 
-                const booksRes = await api.get<Book[]>("/books");
-                setBooks(booksRes.data);
+                await refreshBooksAndAuthors();
 
                 setEditOpen(false);
                 setBookToEdit(null);

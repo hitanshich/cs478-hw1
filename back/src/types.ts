@@ -27,7 +27,37 @@ export type BookCreate = z.infer<typeof BookCreateSchema>;
 export type Book = {
   id: number;
   authorID: number;
+  createdByUserID: number;
   title: string;
   publishYear: string;
   genre: string;
 };
+
+
+export const UsernameSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-zA-Z0-9_]+$/, "username must be letters/numbers/underscore only");
+
+export const PasswordSchema = z.string().min(1).max(200);
+
+export const RegisterSchema = z.object({
+  username: UsernameSchema,
+  password: PasswordSchema,
+});
+
+export type RegisterRequest = z.infer<typeof RegisterSchema>;
+
+export const LoginSchema = z.object({
+  username: UsernameSchema,
+  password: PasswordSchema,
+});
+
+export type LoginRequest = z.infer<typeof LoginSchema>;
+
+export type User = {
+  id: number;
+  username: string;
+};
+

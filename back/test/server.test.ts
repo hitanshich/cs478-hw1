@@ -61,10 +61,11 @@ beforeEach(async () => {
   }
 
   for (const b of books) {
-    await db.run(
-      "INSERT INTO books(id, author_id, title, pub_year, genre) VALUES(?, ?, ?, ?, ?)",
-      [b.id, b.authorID, b.title, b.publishYear, b.genre]
-    );
+   await db.run(
+  "INSERT INTO books(id, author_id, created_by_user_id, title, pub_year, genre) VALUES(?, ?, ?, ?, ?, ?)",
+  [b.id, b.authorID, 1, b.title, b.publishYear, b.genre]
+);
+
   }
 });
 
