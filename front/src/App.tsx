@@ -95,6 +95,11 @@ export default function App() {
   let [registerUsername, setRegisterUsername] = useState("");
   let [registerPassword, setRegisterPassword] = useState("");
 
+  let [authSeverity, setAuthSeverity] = useState<"success" | "error" | "info">( "info" );
+  let [registerOpen, setRegisterOpen] = useState(false);
+
+
+
   async function refreshBooksAndAuthors() {
     const booksRes = await api.get<Book[]>("/books");
     setBooks(booksRes.data);
@@ -121,10 +126,8 @@ export default function App() {
         setError("Failed to load data.");
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // If user logs out, close any destructive dialogs
   useEffect(() => {
     if (!user) {
       setEditOpen(false);
@@ -138,50 +141,62 @@ export default function App() {
   }, [user]);
 
   async function doLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setAuthMessage(null);
+  e.preventDefault();
+  setAuthMessage(null);
 
-    try {
-      await api.post("/auth/login", {
-        username: loginUsername.trim(),
-        password: loginPassword,
-      });
+  try {
+    await api.post("/auth/login", {
+      username: loginUsername.trim(),
+      password: loginPassword,
+    });
 
-      setLoginPassword("");
-      await refreshMe();
-      await refreshBooksAndAuthors();
-      setAuthMessage("Logged in!");
-    } catch (err: any) {
-      setAuthMessage(err.response?.data?.error ?? "Login failed");
-    }
+    setLoginPassword("");
+    await refreshMe();
+    await refreshBooksAndAuthors();
+
+    setAuthSeverity("success");
+    setAuthMessage("Logged in!");
+  } catch (err: any) {
+    setAuthSeverity("error");
+    setAuthMessage(err.response?.data?.error ?? "Login failed");
   }
+}
+
 
   async function doRegister(e: React.FormEvent) {
-    e.preventDefault();
-    setAuthMessage(null);
+  e.preventDefault();
+  setAuthMessage(null);
 
-    try {
-      await api.post("/auth/register", {
-        username: registerUsername.trim(),
-        password: registerPassword,
-      });
+  try {
+    await api.post("/auth/register", {
+      username: registerUsername.trim(),
+      password: registerPassword,
+    });
 
-      setRegisterPassword("");
-      setAuthMessage("Account created! You can log in now.");
-    } catch (err: any) {
-      setAuthMessage(err.response?.data?.error ?? "Register failed");
-    }
+    setRegisterPassword("");
+
+    setAuthSeverity("success");
+    setLoginUsername(registerUsername.trim());
+    setAuthMessage("Account created! You can log in now.");
+
+    setRegisterOpen(false);
+  } catch (err: any) {
+    setAuthSeverity("error");
+    setAuthMessage(err.response?.data?.error ?? "Register failed");
   }
+}
+
 
   async function doLogout() {
-    setAuthMessage(null);
-    try {
-      await api.post("/auth/logout");
-    } finally {
-      setUser(null);
-      setAuthMessage("Logged out.");
-    }
+  setAuthMessage(null);
+  try {
+    await api.post("/auth/logout");
+  } finally {
+    setUser(null);
+    setAuthSeverity("success");
+    setAuthMessage("Logged out.");
   }
+}
 
   async function submitBook(e: React.FormEvent) {
     e.preventDefault();
@@ -304,84 +319,64 @@ export default function App() {
             )}
           </Box>
 
-          {!user && (
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={2}
-              sx={{ width: { md: "60%" } }}
-            >
-              <Box
-                component="form"
-                onSubmit={doLogin}
-                sx={{
-                  display: "flex",
-                  gap: 1,
-                  flex: 1,
-                  flexDirection: { xs: "column", sm: "row" },
-                }}
-              >
-                <TextField
-                  label="Username"
-                  value={loginUsername}
-                  onChange={(e) => setLoginUsername(e.target.value)}
-                  size="small"
-                  required
-                  fullWidth
-                />
-                <TextField
-                  label="Password"
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  size="small"
-                  required
-                  fullWidth
-                />
-                <Button type="submit" variant="contained">
-                  Log in
-                </Button>
-              </Box>
+         {!user && (
+  <Box sx={{ width: { md: "60%" } }}>
+    <Box
+      component="form"
+      onSubmit={doLogin}
+      sx={{ display: "flex", gap: 1, flexDirection: { xs: "column", sm: "row" } }}
+    >
+      <TextField
+        label="Username"
+        value={loginUsername}
+        onChange={(e) => setLoginUsername(e.target.value)}
+        size="small"
+        required
+        fullWidth
+      />
+      <TextField
+        label="Password"
+        type="password"
+        value={loginPassword}
+        onChange={(e) => setLoginPassword(e.target.value)}
+        size="small"
+        required
+        fullWidth
+      />
+      <Button type="submit" variant="contained" fullWidth>
+        Log in
+      </Button>
+    </Box>
 
-              <Box
-                component="form"
-                onSubmit={doRegister}
-                sx={{
-                  display: "flex",
-                  gap: 1,
-                  flex: 1,
-                  flexDirection: { xs: "column", sm: "row" },
-                }}
-              >
-                <TextField
-                  label="New username"
-                  value={registerUsername}
-                  onChange={(e) => setRegisterUsername(e.target.value)}
-                  size="small"
-                  required
-                  fullWidth
-                />
-                <TextField
-                  label="New password"
-                  type="password"
-                  value={registerPassword}
-                  onChange={(e) => setRegisterPassword(e.target.value)}
-                  size="small"
-                  required
-                  fullWidth
-                />
-                <Button type="submit" variant="outlined">
-                  Register
-                </Button>
-              </Box>
-            </Stack>
-          )}
+    <Typography variant="body2" sx={{ mt: 1 }}>
+      Don&apos;t have an account?{" "}
+      <Button
+        variant="text"
+        size="small"
+        onClick={() => {
+        setAuthMessage(null);
+        setAuthSeverity("info");
+        setRegisterUsername("");
+        setRegisterPassword("");
+        setRegisterOpen(true);
+      }}
+
+      >
+        Register
+      </Button>
+    </Typography>
+  </Box>
+)}
+
+
         </Stack>
 
         {authMessage && (
-  <Alert severity={user ? "success" : "error"} sx={{ mt: 2 }}>
+  <Alert severity={authSeverity} sx={{ mt: 2 }}>
     {authMessage}
   </Alert>
 )}
+
 
       </Paper>
 
@@ -658,6 +653,50 @@ export default function App() {
           </Table>
         </TableContainer>
       </Paper>
+
+      <Dialog
+  open={registerOpen}
+  onClose={() => {
+  setRegisterOpen(false);
+  setRegisterUsername("");
+  setRegisterPassword("");
+}}
+  fullWidth
+  maxWidth="sm"
+>
+  <DialogTitle>Create an account</DialogTitle>
+
+  <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+    <Box
+      component="form"
+      onSubmit={doRegister}
+      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+    >
+      <TextField
+        label="Username"
+        value={registerUsername}
+        onChange={(e) => setRegisterUsername(e.target.value)}
+        required
+        fullWidth
+      />
+      <TextField
+        label="Password"
+        type="password"
+        value={registerPassword}
+        onChange={(e) => setRegisterPassword(e.target.value)}
+        required
+        fullWidth
+      />
+
+      <DialogActions sx={{ px: 0 }}>
+        <Button onClick={() => setRegisterOpen(false)}>Cancel</Button>
+        <Button type="submit" variant="contained">
+          Register
+        </Button>
+      </DialogActions>
+    </Box>
+  </DialogContent>
+</Dialog>
 
       <Dialog
         open={deleteOpen}

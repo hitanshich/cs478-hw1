@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { openDb } from "./db.js";
 import {
   AuthorCreateSchema,
@@ -21,13 +21,69 @@ import { fileURLToPath } from "url";
 
 const app = express();
 app.use(express.json());
-
 app.use(cookieParser());
 app.use(
   helmet({
-    contentSecurityPolicy: false, // IMPORTANT: allow React assets to load
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "script-src": ["'self'"],
+        "style-src": ["'self'", "'unsafe-inline'"], 
+        "img-src": ["'self'", "data:"],
+        "connect-src": ["'self'"],
+      },
+    },
   })
 );
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const publicFolderPath = path.join(__dirname, "public");
+app.use(express.static(publicFolderPath));
+
+const loginRegisterLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100, 
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api", apiLimiter);
+
+function blockCsrf(req: Request, res: Response, next: NextFunction) {
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return next();
+  }
+  const xrw = req.get("X-Requested-With");
+  if (xrw !== "XMLHttpRequest") {
+    return res.status(403).json({ error: "CSRF blocked" });
+  }
+
+  next();
+}
+
+app.use("/api", blockCsrf);
+
+
+function getCookieSettings() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  };
+}
+
+
 
 declare global {
   namespace Express {
@@ -37,12 +93,7 @@ declare global {
   }
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
-// In dist/, your React assets are at dist/public/...
-const PUBLIC_DIR = path.join(__dirname, "public");
-app.use(express.static(PUBLIC_DIR));
 
 
 function parsePositiveInt(value: string): number | null {
@@ -64,21 +115,9 @@ function requirePositiveIn(value: unknown, res: Response): number | null {
   return n;
 }
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
-function cookieOptions() {
-  return {
-    httpOnly: true,
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-  };
-}
+
+
 
 async function getUserFromToken(token: string | undefined): Promise<User | null> {
   if (!token) return null;
@@ -104,9 +143,8 @@ async function requireAuth(req: Request, res: Response): Promise<User | null> {
   return user;
 }
 
-// -------------------- AUTH --------------------
 
-app.post("/api/auth/register", authLimiter, async (req, res) => {
+app.post("/api/auth/register", loginRegisterLimiter, async (req, res) => {
   const parsed = RegisterSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -127,7 +165,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
   return res.status(201).json(created);
 });
 
-app.post("/api/auth/login", authLimiter, async (req, res) => {
+app.post("/api/auth/login", loginRegisterLimiter, async (req, res) => {
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -148,7 +186,7 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     Date.now(),
   ]);
 
-  res.cookie("auth_token", token, cookieOptions());
+  res.cookie("auth_token", token, getCookieSettings());
   return res.json({ id: row.id, username: row.username });
 });
 
@@ -169,7 +207,6 @@ app.get("/api/auth/me", async (req, res) => {
   return res.json(user);
 });
 
-// -------------------- AUTHORS --------------------
 
 app.post("/api/authors", async (req, res) => {
   const user = await requireAuth(req, res);
@@ -226,8 +263,6 @@ app.delete("/api/authors/:id", async (req, res) => {
     return res.status(409).json({ error: "Cannot delete author because they still have books" });
   }
 });
-
-// -------------------- BOOKS --------------------
 
 app.post("/api/books", async (req, res) => {
   const user = await requireAuth(req, res);
@@ -394,9 +429,8 @@ app.delete("/api/books/:id", async (req, res) => {
   return res.status(204).send();
 });
 
-// ✅ Serve React app at /
 app.get("/", (_req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+  res.sendFile(path.join(publicFolderPath, "index.html"));
 });
 
 export { app };
