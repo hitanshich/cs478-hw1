@@ -1,1 +1,1 @@
-This Project is for my homework assignment
+This Project is for my homework assignments
